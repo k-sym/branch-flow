@@ -17,11 +17,11 @@ A simplified alternative to Auto-Claude, designed for developers who prefer:
 
 ```bash
 # Clone or download this repo
-git clone https://github.com/yourusername/branch-flow.git
+git clone https://github.com/k-sym/BranchFlow.git
 
 # Navigate to your project and run the installer
 cd your-project
-bash /path/to/branch-flow/scripts/install.sh
+bash /path/to/BranchFlow/scripts/install.sh
 ```
 
 That's it! The installer automatically:
