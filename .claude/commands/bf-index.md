@@ -65,7 +65,14 @@ Build or update the semantic search index for the codebase, memory, and specs.
 
 ## Configuration
 
-The embedding model can be configured via:
+The embedding provider and model can be configured via:
+
+### Embedding Providers
+
+| Provider | Description | Setup |
+|----------|-------------|-------|
+| `ollama` | Easy setup, runs as service | `ollama serve` then `ollama pull <model>` |
+| `llamacpp` | Lightweight, manual server | `llama-server -m <model.gguf> --embedding` |
 
 ### Option 1: config.json
 ```json
@@ -74,18 +81,26 @@ The embedding model can be configured via:
     "provider": "ollama",
     "model": "nomic-embed-text",
     "dimensions": 768,
-    "ollama_url": "http://localhost:11434"
+    "ollama_url": "http://localhost:11434",
+    "llamacpp_url": "http://localhost:8080"
   }
 }
 ```
 
 ### Option 2: Environment Variables
 ```bash
+# For Ollama
+export BF_EMBEDDING_PROVIDER="ollama"
 export BF_EMBEDDING_MODEL="nomic-embed-text"
 export BF_OLLAMA_URL="http://localhost:11434"
+
+# For llama.cpp
+export BF_EMBEDDING_PROVIDER="llamacpp"
+export BF_EMBEDDING_MODEL="nomic-embed-text-v1.5.Q8_0.gguf"
+export BF_LLAMACPP_URL="http://localhost:8080"
 ```
 
-### Available Models
+### Available Ollama Models
 | Model | Dimensions | Notes |
 |-------|------------|-------|
 | nomic-embed-text | 768 | Default, good balance |
@@ -94,10 +109,22 @@ export BF_OLLAMA_URL="http://localhost:11434"
 | snowflake-arctic-embed | 1024 | Good for code |
 | bge-m3 | 1024 | Multilingual |
 
+### Available llama.cpp Models (GGUF)
+| Model | Dimensions | Download |
+|-------|------------|----------|
+| nomic-embed-text-v1.5.Q8_0.gguf | 768 | [HuggingFace](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF) |
+| bge-small-en-v1.5.Q8_0.gguf | 384 | [HuggingFace](https://huggingface.co/second-state/bge-small-en-v1.5-GGUF) |
+| all-MiniLM-L6-v2.Q8_0.gguf | 384 | [HuggingFace](https://huggingface.co/second-state/all-MiniLM-L6-v2-GGUF) |
+| bge-base-en-v1.5.Q8_0.gguf | 768 | [HuggingFace](https://huggingface.co/second-state/bge-base-en-v1.5-GGUF) |
+
 To change models:
 ```bash
-python .branch-flow/scripts/bf-search.py config --set-model mxbai-embed-large
-/bf:index --rebuild
+# Ollama
+ollama pull mxbai-embed-large
+# Then update config.json
+
+# llama.cpp
+# Download GGUF file, update config.json, restart server
 ```
 
 ## Excluded Files
@@ -140,10 +167,20 @@ To customize, edit `.branch-flow/config.json`:
 ollama serve
 ```
 
-**Error: Model not found**
+**Error: Model not found (Ollama)**
 ```bash
 ollama pull nomic-embed-text
 ```
+
+**Error: llama.cpp server not available**
+```bash
+# Start the server with embedding support
+llama-server -m nomic-embed-text-v1.5.Q8_0.gguf --embedding --port 8080
+```
+
+**Error: llama.cpp connection refused**
+- Check the server is running: `curl http://localhost:8080/health`
+- Verify port matches config: check `llamacpp_url` in config.json
 
 **Search returns no results**
 - Run `/bf:index --rebuild` to force full reindex

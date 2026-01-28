@@ -26,10 +26,11 @@ import argparse
 
 DEFAULT_CONFIG = {
     "embedding": {
-        "provider": "ollama",  # ollama, openai, or local
+        "provider": "ollama",  # ollama or llamacpp
         "model": "nomic-embed-text",
         "dimensions": 768,
         "ollama_url": "http://localhost:11434",
+        "llamacpp_url": "http://localhost:8080",
         "batch_size": 10,
         "chunk_size": 1000,
         "chunk_overlap": 200
@@ -60,6 +61,7 @@ DEFAULT_CONFIG = {
 }
 
 # Model presets for easy switching
+# Ollama models
 MODEL_PRESETS = {
     "nomic-embed-text": {
         "provider": "ollama",
@@ -85,6 +87,34 @@ MODEL_PRESETS = {
         "provider": "ollama",
         "model": "bge-m3",
         "dimensions": 1024
+    }
+}
+
+# llama.cpp GGUF model presets (user must download and specify path)
+LLAMACPP_PRESETS = {
+    "nomic-embed-text-v1.5": {
+        "provider": "llamacpp",
+        "model": "nomic-embed-text-v1.5.Q8_0.gguf",
+        "dimensions": 768,
+        "url": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF"
+    },
+    "bge-small-en-v1.5": {
+        "provider": "llamacpp",
+        "model": "bge-small-en-v1.5.Q8_0.gguf",
+        "dimensions": 384,
+        "url": "https://huggingface.co/second-state/bge-small-en-v1.5-GGUF"
+    },
+    "all-MiniLM-L6-v2": {
+        "provider": "llamacpp",
+        "model": "all-MiniLM-L6-v2.Q8_0.gguf",
+        "dimensions": 384,
+        "url": "https://huggingface.co/second-state/all-MiniLM-L6-v2-GGUF"
+    },
+    "bge-base-en-v1.5": {
+        "provider": "llamacpp",
+        "model": "bge-base-en-v1.5.Q8_0.gguf",
+        "dimensions": 768,
+        "url": "https://huggingface.co/second-state/bge-base-en-v1.5-GGUF"
     }
 }
 
@@ -156,21 +186,96 @@ def get_ollama_embedding(text: str, config: dict) -> List[float]:
         sys.exit(1)
 
 
+def get_llamacpp_embedding(text: str, config: dict) -> List[float]:
+    """Get embedding from llama.cpp server."""
+    import urllib.request
+    import urllib.error
+    
+    url = f"{config['embedding'].get('llamacpp_url', 'http://localhost:8080')}/embedding"
+    data = json.dumps({
+        "content": text
+    }).encode('utf-8')
+    
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            # llama.cpp returns {"embedding": [...]} or {"data": [{"embedding": [...]}]}
+            if "embedding" in result:
+                return result["embedding"]
+            elif "data" in result and len(result["data"]) > 0:
+                return result["data"][0]["embedding"]
+            else:
+                raise ValueError(f"Unexpected response format: {result.keys()}")
+    except urllib.error.URLError as e:
+        print(f"Error connecting to llama.cpp server: {e}", file=sys.stderr)
+        print(f"Make sure llama-server is running with --embedding flag:", file=sys.stderr)
+        print(f"  llama-server -m <model.gguf> --embedding --port 8080", file=sys.stderr)
+        sys.exit(1)
+
+
 def get_embedding(text: str, config: dict) -> List[float]:
     """Get embedding using configured provider."""
     provider = config["embedding"]["provider"]
     
     if provider == "ollama":
         return get_ollama_embedding(text, config)
+    elif provider == "llamacpp":
+        return get_llamacpp_embedding(text, config)
     else:
-        raise ValueError(f"Unknown provider: {provider}")
+        raise ValueError(f"Unknown provider: {provider}. Use 'ollama' or 'llamacpp'.")
 
 
 def ensure_model_available(config: dict) -> bool:
     """Check if the embedding model is available, pull if needed."""
-    if config["embedding"]["provider"] != "ollama":
-        return True
+    provider = config["embedding"]["provider"]
     
+    if provider == "llamacpp":
+        # For llama.cpp, check if server is running
+        return ensure_llamacpp_server(config)
+    elif provider == "ollama":
+        return ensure_ollama_model(config)
+    else:
+        print(f"Unknown provider: {provider}", file=sys.stderr)
+        return False
+
+
+def ensure_llamacpp_server(config: dict) -> bool:
+    """Check if llama.cpp server is running with embedding support."""
+    import urllib.request
+    import urllib.error
+    
+    url = config["embedding"].get("llamacpp_url", "http://localhost:8080")
+    
+    try:
+        # Try to hit the health endpoint or embedding endpoint
+        req = urllib.request.Request(f"{url}/health")
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return True
+    except urllib.error.URLError:
+        pass
+    
+    # Try a simple embedding request to verify
+    try:
+        test_url = f"{url}/embedding"
+        data = json.dumps({"content": "test"}).encode('utf-8')
+        req = urllib.request.Request(test_url, data=data, headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return True
+    except urllib.error.URLError as e:
+        print(f"⚠️  llama.cpp server not available at {url}", file=sys.stderr)
+        print(f"", file=sys.stderr)
+        print(f"Start the server with:", file=sys.stderr)
+        print(f"  llama-server -m <model.gguf> --embedding --port 8080", file=sys.stderr)
+        print(f"", file=sys.stderr)
+        print(f"Example:", file=sys.stderr)
+        print(f"  llama-server -m nomic-embed-text-v1.5.Q8_0.gguf --embedding --port 8080", file=sys.stderr)
+        return False
+
+
+def ensure_ollama_model(config: dict) -> bool:
+    """Check if Ollama model is available, pull if needed."""
     model = config["embedding"]["model"]
     
     # Check if model exists
