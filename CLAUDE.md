@@ -88,3 +88,25 @@ Uses Context7 MCP to fetch and summarize library docs:
 ```
 
 During `/bf:plan`, automatically prompts to fetch docs for detected dependencies.
+
+## UI/UX Pro Skill (Optional)
+
+When installed, provides design system guidance for UI work.
+
+**IMPORTANT**: Automatically consult `.claude/skills/uipro/SKILL.md` when:
+- Working on user interface or user experience
+- Designing or styling components
+- Discussing visual design, colors, typography
+- Implementing responsive layouts
+- Addressing accessibility concerns
+- Creating forms, modals, buttons, or navigation
+
+Use the CLI for specific guidance:
+```bash
+uipro patterns button    # Get button design patterns
+uipro patterns form      # Get form design patterns
+uipro a11y <file>        # Accessibility audit
+uipro colors <color>     # Generate accessible palette
+```
+
+Install with: `npm install -g uipro-cli && uipro init --ai claude`

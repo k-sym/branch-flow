@@ -8,8 +8,6 @@ A simplified alternative to Auto-Claude, designed for developers who prefer:
 - ✅ **Spec-driven development** - Every task starts with a specification
 - ✅ **Self-validating QA** - Built-in quality assurance loop
 - ✅ **Memory persistence** - Context maintained across sessions
-- ✅ **Local Embeddings ** - Indexed Codebase, Sessions, Memories and Plans
-- ✅ **Intelligent Documentation Lookup  ** - Targeted Context7 Retrieval
 
 ---
 
@@ -19,11 +17,11 @@ A simplified alternative to Auto-Claude, designed for developers who prefer:
 
 ```bash
 # Clone or download this repo
-git clone https://github.com/k-sym/BranchFlow.git
+git clone https://github.com/yourusername/branch-flow.git
 
 # Navigate to your project and run the installer
 cd your-project
-bash /path/to/BranchFlow/scripts/install.sh
+bash /path/to/branch-flow/scripts/install.sh
 ```
 
 That's it! The installer automatically:
@@ -35,8 +33,31 @@ That's it! The installer automatically:
 
 The installer will interactively prompt you for:
 
-1. **Embedding Model** - Choose from 5 preset models or enter a custom one
-2. **Context7 API Key** - Optional, for documentation lookup via `/bf:docs`
+1. **Install Mode** - Team (commit to repo) or Personal (gitignore)
+2. **Embedding Provider** - Ollama (recommended) or llama.cpp
+3. **Embedding Model** - Choose from preset models or enter a custom one
+4. **Context7 API Key** - Optional, for documentation lookup via `/bf:docs`
+5. **UI/UX Pro** - Optional, for design system guidance
+
+### Install Modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Team** | Commits Branch Flow files to the repo | Share workflow with team members |
+| **Personal** | Adds Branch Flow to `.gitignore` | Personal workflow on shared repos |
+
+```bash
+# Team mode (default) - share with your team
+./install.sh --team
+
+# Personal mode - keep Branch Flow private
+./install.sh --personal
+```
+
+**Personal mode gitignores:**
+- `.branch-flow/` - All Branch Flow data
+- `.claude/commands/bf-*` - Branch Flow commands
+- `.claude/skills/branch-flow/` - Branch Flow skills
 
 ### Non-Interactive Install
 
@@ -47,6 +68,9 @@ The installer will interactively prompt you for:
 # Use all defaults (no prompts)
 ./install.sh -y
 
+# Personal mode with llama.cpp
+./install.sh --personal --provider llamacpp
+
 # Custom Ollama server
 ./install.sh --ollama-url http://192.168.1.100:11434
 ```
@@ -55,9 +79,15 @@ The installer will interactively prompt you for:
 
 | Option | Description |
 |--------|-------------|
+| `--team` | Commit Branch Flow to repo (share with team) |
+| `--personal` | Add Branch Flow to .gitignore (personal use) |
+| `--provider PROVIDER` | Embedding provider: `ollama` or `llamacpp` |
 | `--model MODEL` | Embedding model (skips selection prompt) |
 | `--ollama-url URL` | Ollama server URL (default: localhost:11434) |
+| `--llamacpp-url URL` | llama.cpp server URL (default: localhost:8080) |
 | `--context7-key KEY` | Context7 API key for docs lookup |
+| `--uipro` | Install UI/UX Pro skill for design guidance |
+| `--skip-uipro` | Skip UI/UX Pro configuration |
 | `--skip-ollama` | Skip Ollama availability check |
 | `--skip-context7` | Skip Context7 configuration |
 | `-y, --non-interactive` | Skip all prompts, use defaults |
@@ -67,8 +97,12 @@ The installer will interactively prompt you for:
 
 | Variable | Description |
 |----------|-------------|
+| `BF_INSTALL_MODE` | Install mode: `team` or `personal` |
+| `BF_INSTALL_UIPRO` | Set to `yes` to install UI/UX Pro |
+| `BF_EMBEDDING_PROVIDER` | Provider: `ollama` or `llamacpp` |
 | `BF_EMBEDDING_MODEL` | Override default embedding model |
 | `BF_OLLAMA_URL` | Override Ollama URL |
+| `BF_LLAMACPP_URL` | Override llama.cpp URL |
 | `BF_CONTEXT7_API_KEY` | Set Context7 API key |
 | `BF_INTERACTIVE` | Set to 'false' for non-interactive |
 
@@ -200,9 +234,16 @@ claude
 
 ## Semantic Search
 
-Branch Flow includes local semantic search powered by Ollama embeddings.
+Branch Flow includes local semantic search powered by Ollama or llama.cpp embeddings.
 
-### Setup
+### Embedding Providers
+
+| Provider | Description | Best For |
+|----------|-------------|----------|
+| **Ollama** | Easy setup, runs as service | Most users (recommended) |
+| **llama.cpp** | Lightweight, manual server | Minimal dependencies |
+
+### Setup with Ollama (Recommended)
 
 1. **Install Ollama**: https://ollama.ai
 
@@ -214,6 +255,25 @@ Branch Flow includes local semantic search powered by Ollama embeddings.
 3. **Pull embedding model** (done automatically during install):
    ```bash
    ollama pull nomic-embed-text
+   ```
+
+4. **Build the index**:
+   ```bash
+   /bf:index
+   ```
+
+### Setup with llama.cpp
+
+1. **Install llama.cpp**: https://github.com/ggerganov/llama.cpp
+
+2. **Download a GGUF embedding model**:
+   - [nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF)
+   - [bge-small-en-v1.5](https://huggingface.co/second-state/bge-small-en-v1.5-GGUF)
+   - [all-MiniLM-L6-v2](https://huggingface.co/second-state/all-MiniLM-L6-v2-GGUF)
+
+3. **Start the embedding server**:
+   ```bash
+   llama-server -m nomic-embed-text-v1.5.Q8_0.gguf --embedding --port 8080
    ```
 
 4. **Build the index**:
@@ -253,19 +313,14 @@ export BF_EMBEDDING_MODEL=mxbai-embed-large
 // .branch-flow/config.json
 {
   "embedding": {
+    "provider": "ollama",
     "model": "mxbai-embed-large",
     "dimensions": 1024
   }
 }
 ```
 
-**Option 3: Command Line**
-```bash
-python .branch-flow/scripts/bf-search.py config --set-model mxbai-embed-large
-/bf:index --rebuild
-```
-
-### Available Models
+### Available Ollama Models
 
 | Model | Dimensions | Notes |
 |-------|------------|-------|
@@ -275,15 +330,21 @@ python .branch-flow/scripts/bf-search.py config --set-model mxbai-embed-large
 | `snowflake-arctic-embed` | 1024 | Good for code |
 | `bge-m3` | 1024 | Multilingual support |
 
+### Available llama.cpp Models (GGUF)
+
+| Model | Dimensions | Download |
+|-------|------------|----------|
+| `nomic-embed-text-v1.5.Q8_0.gguf` | 768 | [HuggingFace](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF) |
+| `bge-small-en-v1.5.Q8_0.gguf` | 384 | [HuggingFace](https://huggingface.co/second-state/bge-small-en-v1.5-GGUF) |
+| `all-MiniLM-L6-v2.Q8_0.gguf` | 384 | [HuggingFace](https://huggingface.co/second-state/all-MiniLM-L6-v2-GGUF) |
+| `bge-base-en-v1.5.Q8_0.gguf` | 768 | [HuggingFace](https://huggingface.co/second-state/bge-base-en-v1.5-GGUF) |
+
 ### What Gets Indexed
 
 - **Codebase**: All source files matching configured extensions
 - **Memory**: project-context.md, decisions.md, learnings.md
 - **Specs**: All task specifications
 - **Plans**: All implementation plans
-
-### Why local LLMs?
-Some of the code bases I work on are quite large and unruly whilst I appreciate existing tools may be better suited (the excellent 'Serena' MCP for example), I found that leaning too heavily on using MCPs for the heavy lifting took up too much of the context window. If something more targeted, specific and quickly accessible was availavle, then using a local LLM seems to be a perfect fit. Again, it may not be for everybody, but really helps for my specific work cases.
 
 ### Configuration
 
@@ -296,6 +357,7 @@ Full embedding configuration in `.branch-flow/config.json`:
     "model": "nomic-embed-text",
     "dimensions": 768,
     "ollama_url": "http://localhost:11434",
+    "llamacpp_url": "http://localhost:8080",
     "chunk_size": 1000,
     "chunk_overlap": 200
   },
@@ -314,15 +376,18 @@ Full embedding configuration in `.branch-flow/config.json`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `BF_INSTALL_MODE` | Install mode: `team` or `personal` | `team` |
+| `BF_EMBEDDING_PROVIDER` | Provider: `ollama` or `llamacpp` | `ollama` |
 | `BF_EMBEDDING_MODEL` | Embedding model name | `nomic-embed-text` |
 | `BF_OLLAMA_URL` | Ollama server URL | `http://localhost:11434` |
+| `BF_LLAMACPP_URL` | llama.cpp server URL | `http://localhost:8080` |
 | `BF_CHUNK_SIZE` | Text chunk size | `1000` |
 
 ---
 
 ## Documentation Research (Context7)
 
-Branch Flow integrates with Context7 MCP to fetch and summarize library documentation while keeping context lean - therefore, (hopefully) not taking up too much of the context window, especially after it's been indexed. 
+Branch Flow integrates with Context7 MCP to fetch and summarize library documentation while keeping context lean.
 
 ### Why?
 
@@ -585,6 +650,83 @@ Ideas are stored in `.branch-flow/ideas/ideas.json`:
   ]
 }
 ```
+
+---
+
+## UI/UX Pro Skill (Optional)
+
+Branch Flow can optionally integrate with UI/UX Pro for design system guidance when working on user interfaces.
+
+### Installation
+
+During Branch Flow installation, choose to install UI/UX Pro when prompted, or install manually:
+
+```bash
+# Install the CLI globally
+npm install -g uipro-cli
+
+# Initialize in your project
+uipro init --ai claude
+```
+
+Or use the installer flag:
+```bash
+./install.sh --uipro
+```
+
+### What It Does
+
+When installed, Claude automatically consults the UI/UX Pro skill for:
+
+- **User Interface Design** - Component patterns, layouts, visual hierarchy
+- **User Experience** - User flows, interaction patterns, feedback states
+- **Visual Design** - Colors, typography, spacing, consistency
+- **Accessibility** - WCAG compliance, screen reader support, keyboard navigation
+- **Responsive Design** - Mobile-first patterns, breakpoints, touch targets
+- **Component Patterns** - Buttons, forms, modals, tables, navigation
+
+### CLI Commands
+
+```bash
+# Get design patterns for a component type
+uipro patterns button
+uipro patterns form
+uipro patterns modal
+uipro patterns table
+
+# Run accessibility audit on a file
+uipro a11y src/components/LoginForm.vue
+
+# Generate accessible color palette
+uipro colors "#3B82F6"
+
+# Check design consistency
+uipro check
+
+# View spacing system
+uipro spacing
+```
+
+### Integration with Workflow
+
+The UI/UX Pro skill integrates naturally with Branch Flow:
+
+```
+/bf:ideate           → Generates UI/UX improvement ideas
+/bf:spec "Redesign login form"  → Claude consults UI/UX skill
+/bf:plan             → Plan includes design patterns
+/bf:build            → Implementation follows design principles
+/bf:review           → Checks accessibility and consistency
+```
+
+### When to Use
+
+Claude will automatically reference the UI/UX Pro skill when you mention:
+- "design", "UI", "UX", "interface", "layout"
+- "component", "button", "form", "modal"
+- "style", "styling", "CSS", "colors", "theme"
+- "responsive", "mobile", "accessibility"
+- "animation", "loading state", "empty state"
 
 ---
 
