@@ -17,7 +17,7 @@ A simplified alternative to Auto-Claude, designed for developers who prefer:
 
 ```bash
 # Clone or download this repo
-git clone https://github.com/yourusername/branch-flow.git
+git clone https://github.com/k-sym/branch-flow.git
 
 # Navigate to your project and run the installer
 cd your-project
